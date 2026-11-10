@@ -1,0 +1,15 @@
+__pycache__/
+.pytest_cache/
+data/
+.env
+*.db
+# Flutter
+app/.dart_tool/
+app/build/
+app/.flutter-plugins*
+app/pubspec.lock
+app/android/
+app/ios/
+app/*.iml
+app/.metadata
+app/.idea/
