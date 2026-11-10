@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'screens/doctor.dart';
 import 'screens/home.dart';
 import 'screens/onboarding.dart';
 import 'state.dart';
@@ -35,6 +36,12 @@ class TenTakaApp extends StatelessWidget {
             ),
             inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
           ),
+          // A server in test mode hands out login codes and free top-ups: make that impossible to miss.
+          builder: (BuildContext context, Widget? child) {
+            final Widget screen = child ?? const SizedBox.shrink();
+            if (appState.config?['test_mode'] != true) return screen;
+            return Banner(message: 'TEST', location: BannerLocation.topStart, child: screen);
+          },
           // Keyed by language so that switching language redraws the whole screen.
           home: KeyedSubtree(key: ValueKey<String>(appState.lang), child: _currentScreen()),
         );
@@ -57,6 +64,17 @@ class TenTakaApp extends StatelessWidget {
     }
     if (me['consent_needed'] == true) {
       return const ConsentScreen();
+    }
+    if (me['role'] == 'doctor') {
+      final dynamic profile = me['profile'];
+      final dynamic status = profile is Map ? profile['status'] : null;
+      if (status == 'approved') {
+        return const DoctorHomeScreen();
+      }
+      if (status == 'pending') {
+        return const DoctorPendingScreen();
+      }
+      return const DoctorVerificationScreen();
     }
     if (me['profile'] == null) {
       return const ProfileScreen();

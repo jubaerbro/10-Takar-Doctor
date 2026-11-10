@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Address of the backend. Set at build time:
@@ -49,20 +50,38 @@ class Api {
 
   Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) => _send('PUT', path, body);
 
-  Future<Map<String, dynamic>> _send(String method, String path, Map<String, dynamic>? body) async {
+  /// Send one file with some form fields (used for the doctor's verification documents).
+  Future<Map<String, dynamic>> upload(
+    String path, {
+    required Map<String, String> fields,
+    required List<int> bytes,
+    required String filename,
+    required String mimeType,
+  }) {
+    final request = http.MultipartRequest('POST', Uri.parse('$apiBaseUrl$path'));
+    request.fields.addAll(fields);
+    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename, contentType: MediaType.parse(mimeType)));
+    return _deliver(request, const Duration(seconds: 90));
+  }
+
+  Future<Map<String, dynamic>> _send(String method, String path, Map<String, dynamic>? body) {
     final request = http.Request(method, Uri.parse('$apiBaseUrl$path'));
     request.headers['Content-Type'] = 'application/json';
+    if (body != null) {
+      request.body = jsonEncode(body);
+    }
+    return _deliver(request, const Duration(seconds: 20));
+  }
+
+  Future<Map<String, dynamic>> _deliver(http.BaseRequest request, Duration timeout) async {
     final currentToken = token;
     if (currentToken != null) {
       request.headers['Authorization'] = 'Bearer $currentToken';
     }
-    if (body != null) {
-      request.body = jsonEncode(body);
-    }
 
     http.Response response;
     try {
-      final streamed = await _client.send(request).timeout(const Duration(seconds: 20));
+      final streamed = await _client.send(request).timeout(timeout);
       response = await http.Response.fromStream(streamed);
     } catch (_) {
       throw ApiException(0, 'network', 'Could not reach the server.');

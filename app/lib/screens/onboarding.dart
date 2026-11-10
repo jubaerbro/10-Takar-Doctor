@@ -62,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _code = TextEditingController();
   bool _codeSent = false;
   bool _busy = false;
+  String _role = 'patient';
 
   @override
   void dispose() {
@@ -94,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final Map<String, dynamic> result = await appState.api.post('/auth/otp/verify', <String, dynamic>{
         'phone': _phone.text.trim(),
         'code': _code.text.trim(),
-        'role': 'patient',
+        'role': _role,
         'language': appState.lang,
       });
       await appState.loggedIn(result['token'] as String, (result['me'] as Map).cast<String, dynamic>());
@@ -118,7 +119,20 @@ class _LoginScreenState extends State<LoginScreen> {
             Text(t('app_name'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(t('login_title'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: <Widget>[
+                for (final String role in <String>['patient', 'doctor'])
+                  ChoiceChip(
+                    label: Text(t('role_$role')),
+                    selected: _role == role,
+                    onSelected: _codeSent ? null : (bool on) => setState(() => _role = role),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: _phone,
               enabled: !_codeSent,
@@ -180,6 +194,8 @@ class _ConsentScreenState extends State<ConsentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Doctors agree to the doctor agreement; patients to the patient terms.
+    final String prefix = appState.me?['role'] == 'doctor' ? 'd_consent_' : 'consent_';
     return Scaffold(
       appBar: AppBar(title: Text(t('consent_title')), actions: const <Widget>[LanguageButton()]),
       body: SafeArea(
@@ -190,7 +206,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
               Expanded(
                 child: ListView(
                   children: <Widget>[
-                    for (final String key in <String>['consent_1', 'consent_2', 'consent_3', 'consent_4'])
+                    for (final String key in <String>['${prefix}1', '${prefix}2', '${prefix}3', '${prefix}4'])
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Row(

@@ -5,7 +5,8 @@ Instant, low-cost video consultations with verified doctors in Bangladesh.
 | Folder | What it is | Status |
 | --- | --- | --- |
 | `backend/` | The server the apps talk to | Working, with automated tests |
-| `app/` | Flutter mobile app, patient side | First version. Doctor side and live video not built yet |
+| `app/` | Flutter mobile app, patient and doctor sides | First version. Live video not built yet |
+| `render.yaml` | One-step hosting of the backend on Render (Singapore) | Not yet tried on Render |
 | `.github/workflows/` | Builds the Android test app and runs the backend tests on every push | |
 
 The web admin panel is not started.
@@ -21,7 +22,22 @@ Every push to `main` builds a test APK: open the repository's **Actions** tab, p
 set the repository variable `API_BASE_URL` (Settings → Secrets and variables → Actions → Variables)
 to its `https://` address.
 
-Not in the app yet: the video picture (waiting for a LiveKit account), real payments, doctor mode, bookings.
+Doctor flow: doctor agreement, details, photos of BMDC certificate, degree, NID and a selfie, submit for
+verification, then an online switch, incoming calls with accept and decline, waiting requests, the call
+screen, the written advice note and earnings.
+
+Not in the app yet: the video picture (waiting for a LiveKit account), real payments, phone notifications, bookings.
+
+## Hosting the backend
+
+`render.yaml` sets the backend up on [Render](https://render.com) in the Singapore region with a 1 GB disk.
+In Render choose **New > Blueprint**, pick this repository, and enter an admin email and password when asked.
+Then copy the service's `https://...onrender.com` address into the GitHub repository variable `API_BASE_URL`
+and re-run the **Build Android app** workflow.
+
+The blueprint starts the server in **test mode** (`DEV_MODE=1`): login codes are shown in the app and top-ups
+are free, so the app can be tried before SMS and payment accounts exist. The app shows a TEST ribbon while
+this is on. Set `DEV_MODE` to `0` in Render before any real user touches it.
 
 ## What the backend does today
 

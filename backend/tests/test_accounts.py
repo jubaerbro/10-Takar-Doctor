@@ -113,6 +113,7 @@ def test_admin_roles_and_settings(api):
     api.ok(api.put("/admin/settings", admin, {"instant_call_price_taka": 12, "instant_call_max_minutes": 8}))
     config = api.ok(api.get("/config"))
     assert config["instant_call_price_taka"] == 12 and config["instant_call_max_minutes"] == 8
+    assert config["test_mode"] is True
     entry = api.ok(api.get("/admin/audit", admin))["entries"]
     assert {"old": 10, "new": 12} in [e["detail"] for e in entry]
 

@@ -1,0 +1,26 @@
+# Render Blueprint: hosts the backend in Singapore (the closest Render region to Bangladesh).
+# In Render: New > Blueprint > pick this repository. You will be asked for ADMIN_EMAIL and ADMIN_PASSWORD.
+services:
+  - type: web
+    name: ten-takar-doctor-api
+    runtime: docker
+    region: singapore
+    plan: starter            # a paid plan is required: the free plan cannot keep a disk and goes to sleep
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    disk:                    # holds the database and the doctors' uploaded documents
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # TEST MODE. "1" lets the app be tried before SMS and payment accounts exist: login codes are shown
+      # in the app and top-ups are free. It MUST be changed to "0" before any real patient or doctor uses it.
+      - key: DEV_MODE
+        value: "1"

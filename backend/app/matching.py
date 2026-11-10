@@ -366,6 +366,7 @@ async def public_config(request, user, data):
         "free_skip_seconds": s["free_skip_seconds"], "min_topup_taka": s["min_topup_taka"],
         "doctor_registration_fee_taka": s["doctor_registration_fee_taka"], "terms_version": s["terms_version"],
         "specialties": s["specialties"], "designations": settings_store.DESIGNATIONS,
+        "test_mode": core.config.dev_mode,   # the apps show a TEST banner when this is on
     }
 
 
