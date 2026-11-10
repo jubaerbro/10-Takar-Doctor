@@ -1,0 +1,5 @@
+# Uses the analyzer's built-in defaults. Kept in the repository so `flutter create` does not
+# generate one that needs an extra package.
+analyzer:
+  errors:
+    use_build_context_synchronously: ignore

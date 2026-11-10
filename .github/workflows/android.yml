@@ -27,7 +27,9 @@ jobs:
 
       # The Android project files are generated here, not stored in the repository (yet).
       - name: Generate Android project files
-        run: flutter create --platforms=android --org com.tentakardoctor --project-name ten_takar_doctor .
+        run: |
+          flutter create --platforms=android --org com.tentakardoctor --project-name ten_takar_doctor .
+          rm -f test/widget_test.dart   # the sample test that flutter create adds does not match this app
 
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
