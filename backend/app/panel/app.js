@@ -153,6 +153,7 @@ async function show(viewId, arg) {
   for (const button of document.querySelectorAll('.nav button[data-view]')) {
     button.classList.toggle('active', button.getAttribute('data-view') === viewId);
   }
+  if ($toast.classList.contains('error')) $toast.className = 'toast hidden';   // an old error should not follow the admin to a new screen
   const ticket = ++showCounter;   // if the admin clicks elsewhere while this loads, drop the stale result
   $main.replaceChildren(h('p', { class: 'muted' }, 'Loading…'));
   try {
