@@ -24,10 +24,9 @@ import json
 import math
 from typing import Literal
 
-import jwt
 from pydantic import BaseModel, Field
 
-from . import core, settings_store, wallet
+from . import core, settings_store, video, wallet
 from .accounts import doctor_public, patient_public
 from .api import hub, route
 from .core import ApiError
@@ -44,16 +43,8 @@ LIVE_FOR_DOCTOR = "('offered', 'ready', 'active')"
 
 
 def video_credentials(c, user_id: str) -> dict | None:
-    """Join details for the video room. Uses LiveKit's access-token format (a signed JWT)."""
-    cfg = core.config
-    if not (cfg.livekit_api_key and cfg.livekit_api_secret):
-        return None
-    payload = {
-        "iss": cfg.livekit_api_key, "sub": user_id, "nbf": int(core.now()) - 10,
-        "exp": int(c["started_at"] + c["max_seconds"]) + 60,
-        "video": {"room": c["id"], "roomJoin": True, "canPublish": True, "canSubscribe": True},
-    }
-    return {"url": cfg.livekit_url, "room": c["id"], "token": jwt.encode(payload, cfg.livekit_api_secret, algorithm="HS256")}
+    """Join details for this call's video room, valid until the call's time limit."""
+    return video.join_credentials(c["id"], user_id, c["started_at"] + c["max_seconds"] + 30)
 
 
 def view(c, role: str) -> dict:
@@ -328,6 +319,7 @@ def finish(c, ended_by: str) -> Events:
             "price_charged_poisha = ?, doctor_pay_poisha = ? WHERE id = ?",
             "skipped" if free else "ended", ended_by, now, duration, price, pay, c["id"],
         )
+    video.close_room(c["id"])
     return both(c["id"])
 
 

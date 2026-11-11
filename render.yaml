@@ -20,6 +20,13 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      # Video calls: copy these three from your LiveKit project's settings (Settings > API keys).
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
       # TEST MODE. "1" lets the app be tried before SMS and payment accounts exist: login codes are shown
       # in the app and top-ups are free. It MUST be changed to "0" before any real patient or doctor uses it.
       - key: DEV_MODE

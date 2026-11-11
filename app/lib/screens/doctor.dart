@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../api.dart';
 import '../state.dart';
 import '../strings.dart';
+import '../video.dart';
 import 'home.dart';
 import 'onboarding.dart';
 
@@ -784,11 +785,9 @@ class _DoctorCallScreenState extends State<DoctorCallScreen> {
         _patientCard(),
         const SizedBox(height: 16),
         Expanded(
-          child: Container(
-            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(24),
-            child: Text(t('video_pending'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+          child: VideoPanel(
+            key: ValueKey<String>(_id),
+            video: _c['video'] is Map ? (_c['video'] as Map).cast<String, dynamic>() : null,
           ),
         ),
         const SizedBox(height: 12),

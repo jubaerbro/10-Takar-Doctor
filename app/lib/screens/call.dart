@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../state.dart';
 import '../strings.dart';
+import '../video.dart';
 import 'onboarding.dart';
 
 /// One screen for the whole life of a consultation: searching, the call itself, and the summary after.
@@ -272,6 +273,11 @@ class _CallScreenState extends State<CallScreen> {
 
   // --------------------------------------------------------------------------- the call
 
+  Map<String, dynamic>? _videoDetails() {
+    final dynamic video = _c['video'];
+    return video is Map ? video.cast<String, dynamic>() : null;
+  }
+
   Widget _doctorCard() {
     final dynamic doctor = _c['doctor'];
     if (doctor is! Map) return const SizedBox.shrink();
@@ -315,15 +321,8 @@ class _CallScreenState extends State<CallScreen> {
       children: <Widget>[
         _doctorCard(),
         const SizedBox(height: 16),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(24),
-            // The video picture goes here once the video service is connected (see README).
-            child: Text(t('video_pending'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
-          ),
-        ),
+        // Keyed by the call: "Next doctor" starts a new call, which must get a fresh video connection.
+        Expanded(child: VideoPanel(key: ValueKey<String>(_id), video: _videoDetails())),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
