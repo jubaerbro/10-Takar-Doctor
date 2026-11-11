@@ -5,7 +5,7 @@ Instant, low-cost video consultations with verified doctors in Bangladesh.
 | Folder | What it is | Status |
 | --- | --- | --- |
 | `backend/` | The server the apps talk to | Working, with automated tests |
-| `app/` | Flutter mobile app, patient and doctor sides | First version. Live video not built yet |
+| `app/` | Flutter mobile app, patient and doctor sides, with live video | Builds; not yet run on a phone |
 | `render.yaml` | One-step hosting of the backend on Render (Singapore) | Not yet tried on Render |
 | `.github/workflows/` | Builds the Android test app and runs the backend tests on every push | |
 
@@ -41,7 +41,19 @@ Doctor flow: doctor agreement, details, photos of BMDC certificate, degree, NID 
 verification, then an online switch, incoming calls with accept and decline, waiting requests, the call
 screen, the written advice note and earnings.
 
-Not in the app yet: the video picture (waiting for a LiveKit account), real payments, phone notifications, bookings.
+Not in the app yet: real payments, phone notifications, bookings.
+
+## Video calls
+
+Video runs on [LiveKit](https://livekit.io). The server needs three values from the LiveKit project
+(Settings > API keys): `LIVEKIT_URL` (starts with `wss://`), `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`.
+Until they are set, calls work without a picture and the app says so.
+
+- The secret stays on the server. Each app gets a token that lets one person into one call's room, for
+  camera and microphone only, and that expires with the call's time limit.
+- Room names and identities are random ids, never names or phone numbers.
+- When a call ends, the server closes the room, so nobody can keep talking past the limit.
+- Either side can switch their microphone or camera off during the call.
 
 ## Hosting the backend
 
@@ -67,7 +79,7 @@ this is on. Set `DEV_MODE` to `0` in Render before any real user touches it.
 | Waiting requests: saved when no matching doctor is free, offered to the next one who comes online | Working. Phone notifications not built yet. |
 | Doctor pay by designation: per call + per minute | Working |
 | Advice notes (no medicine field), ratings, reports, suspensions | Working |
-| Video rooms | Join tokens are issued in LiveKit's format. Not yet tried against a LiveKit server. |
+| Video calls (LiveKit) | Per-call join tokens; the room is closed when the call ends. Not yet tried against a real LiveKit project. |
 | Bookings, Pro plans, discounts and promo codes | Not built yet |
 
 ## Run it
