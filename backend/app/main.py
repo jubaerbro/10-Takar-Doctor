@@ -8,7 +8,9 @@ import logging
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from pathlib import Path
+
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -22,6 +24,31 @@ from . import accounts, wallet, matching, admin  # noqa: E402,F401
 
 async def health(request):
     return JSONResponse({"ok": True})
+
+
+PANEL_DIR = Path(__file__).parent / "panel"
+PANEL_FILES = {"": ("index.html", "text/html"), "app.js": ("app.js", "text/javascript"), "style.css": ("style.css", "text/css")}
+PANEL_HEADERS = {
+    # The panel may only load its own files: no inline scripts, no outside sites, no framing by other pages.
+    "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
+                               "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-cache",
+}
+
+
+async def panel(request):
+    """The admin panel: a small web page served by the backend itself, at /panel/."""
+    entry = PANEL_FILES.get(request.path_params.get("name", ""))
+    if not entry:
+        return JSONResponse({"error": {"code": "not_found", "message": "Not found."}}, status_code=404)
+    return FileResponse(PANEL_DIR / entry[0], media_type=entry[1], headers=PANEL_HEADERS)
+
+
+async def panel_redirect(request):
+    return RedirectResponse("/panel/")
 
 
 async def websocket(ws: WebSocket):
@@ -71,7 +98,8 @@ def create_app(config: Config | None = None, background_sweep: bool = True) -> S
         middleware.append(Middleware(CORSMiddleware, allow_origins=core.config.cors_origins,
                                      allow_methods=["*"], allow_headers=["*"]))
     return Starlette(
-        routes=[Route("/health", health), *ROUTES, WebSocketRoute("/ws", websocket)],
+        routes=[Route("/health", health), Route("/panel", panel_redirect), Route("/panel/", panel),
+                Route("/panel/{name}", panel), *ROUTES, WebSocketRoute("/ws", websocket)],
         exception_handlers={ApiError: api_error_handler},
         middleware=middleware,
         lifespan=lifespan,

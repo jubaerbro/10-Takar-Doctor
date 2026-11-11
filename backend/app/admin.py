@@ -67,6 +67,17 @@ async def create_admin(request, admin, data: NewAdmin):
     return {"id": admin_id, "email": data.email.lower(), "admin_role": data.admin_role}
 
 
+@route("/admin/me", ["GET"], roles=("admin",))
+async def admin_me(request, admin, data):
+    return {"id": admin["id"], "email": admin["email"], "admin_role": admin["admin_role"]}
+
+
+@route("/admin/admins", ["GET"], roles=("admin",), admin_roles=SUPER)
+async def list_admins(request, admin, data):
+    found = core.rows("SELECT id, email, admin_role, status, created_at FROM admins ORDER BY created_at")
+    return {"admins": [dict(a) for a in found]}
+
+
 # --------------------------------------------------------------------------- settings
 
 
@@ -165,6 +176,55 @@ async def review_doctor(request, admin, data: Review):
 # --------------------------------------------------------------------------- support and finance
 
 
+def user_summary(user_id: str | None) -> dict | None:
+    """One line about a user for admin lists: who they are, without their documents."""
+    u = core.one("SELECT * FROM users WHERE id = ?", user_id) if user_id else None
+    if not u:
+        return None
+    out = {"id": u["id"], "role": u["role"], "phone": u["phone"], "alias": u["alias"], "status": u["status"],
+           "balance_taka": core.to_taka(u["balance_poisha"]), "created_at": u["created_at"], "name": None, "doctor_status": None}
+    if u["role"] == "doctor":
+        d = core.one("SELECT real_name, status, designation FROM doctor_profiles WHERE user_id = ?", u["id"])
+        if d:
+            out.update(name=d["real_name"], doctor_status=d["status"], designation=d["designation"])
+    else:
+        p = core.one("SELECT real_name FROM patient_profiles WHERE user_id = ?", u["id"])
+        if p:
+            out["name"] = p["real_name"]
+    return out
+
+
+@route("/admin/users", ["GET"], roles=("admin",), admin_roles=SUPPORT)
+async def search_users(request, admin, data):
+    """Find users by part of a phone number, nickname or name. With no search text: the newest accounts."""
+    q = request.query_params.get("q", "").strip()
+    if q:
+        like = f"%{q}%"
+        found = core.rows(
+            "SELECT u.id FROM users u LEFT JOIN doctor_profiles d ON d.user_id = u.id LEFT JOIN patient_profiles p ON p.user_id = u.id "
+            "WHERE u.phone LIKE ? OR u.alias LIKE ? OR d.real_name LIKE ? OR p.real_name LIKE ? OR u.id = ? "
+            "ORDER BY u.created_at DESC LIMIT 50", like, like, like, like, q)
+    else:
+        found = core.rows("SELECT id FROM users ORDER BY created_at DESC LIMIT 50")
+    return {"users": [user_summary(r["id"]) for r in found]}
+
+
+@route("/admin/users/{user_id}", ["GET"], roles=("admin",), admin_roles=SUPPORT)
+async def get_user(request, admin, data):
+    summary = user_summary(request.path_params["user_id"])
+    if not summary:
+        raise ApiError(404, "not_found", "User not found.")
+    txns = core.rows("SELECT type, amount_poisha, balance_after_poisha, note, created_at FROM wallet_transactions "
+                     "WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 30", summary["id"])
+    column = "doctor_id" if summary["role"] == "doctor" else "patient_id"
+    calls = core.one(f"SELECT COUNT(*) AS n FROM consultations WHERE {column} = ? AND status = 'ended'", summary["id"])["n"]
+    reports = core.one("SELECT COUNT(*) AS n FROM reports WHERE target_id = ?", summary["id"])["n"]
+    return {**summary, "completed_calls": calls, "reports_against": reports,
+            "transactions": [{"type": t["type"], "amount_taka": core.to_taka(t["amount_poisha"]),
+                              "balance_after_taka": core.to_taka(t["balance_after_poisha"]), "note": t["note"],
+                              "created_at": t["created_at"]} for t in txns]}
+
+
 class Suspend(BaseModel):
     suspended: bool
     reason: str = Field(min_length=2, max_length=500)
@@ -210,7 +270,12 @@ async def adjust_wallet(request, admin, data: Adjust):
 async def list_reports(request, admin, data):
     status = request.query_params.get("status", "open")
     found = core.rows("SELECT * FROM reports WHERE status = ? ORDER BY created_at ASC LIMIT 200", status)
-    return {"reports": [dict(r) for r in found]}
+    out = []
+    for r in found:
+        c = core.one("SELECT problem, started_at, duration_seconds, status FROM consultations WHERE id = ?", r["consultation_id"])
+        out.append({**dict(r), "reporter": user_summary(r["reporter_id"]), "target": user_summary(r["target_id"]),
+                    "consultation": dict(c) if c else None})
+    return {"reports": out}
 
 
 class Resolve(BaseModel):

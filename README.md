@@ -9,7 +9,22 @@ Instant, low-cost video consultations with verified doctors in Bangladesh.
 | `render.yaml` | One-step hosting of the backend on Render (Singapore) | Not yet tried on Render |
 | `.github/workflows/` | Builds the Android test app and runs the backend tests on every push | |
 
-The web admin panel is not started.
+## Admin panel
+
+The backend serves a web admin panel at `/panel/` (for example `https://your-server/panel/`). Log in with the
+admin email and password the server was started with.
+
+| Screen | Who can use it | What it does |
+| --- | --- | --- |
+| Dashboard | every admin | Live counts, and today's income, doctor pay and what is left |
+| Doctor verification | verifier (support can view) | Open documents, approve with a designation, ask for changes, reject |
+| Users and wallets | support and finance | Search, suspend or restore, refund or correct a balance, record a doctor payout |
+| Reports | support and finance | Read and resolve reports |
+| Prices and settings | super admin | Every price, pay rate, fee and limit, with the pay for a full-length call worked out as you type |
+| Admin accounts, Audit log | super admin | Add admins; see every admin action |
+
+It is plain HTML and JavaScript with no outside libraries and a strict content-security policy.
+Admin two-factor login is not built yet.
 
 ## Mobile app
 
