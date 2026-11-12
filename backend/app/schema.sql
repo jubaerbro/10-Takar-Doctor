@@ -176,3 +176,41 @@ CREATE TABLE IF NOT EXISTS audit_log (
     detail     TEXT NOT NULL DEFAULT '{}',   -- JSON
     created_at REAL NOT NULL
 );
+
+-- Bookable hours a doctor has opened, and the bookings patients have made against them.
+CREATE TABLE IF NOT EXISTS availability_slots (
+    id         TEXT PRIMARY KEY,
+    doctor_id  TEXT NOT NULL REFERENCES users (id),
+    start_at   REAL NOT NULL,
+    end_at     REAL NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'booked', 'cancelled')),
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS slot_doctor ON availability_slots (doctor_id, start_at);
+
+CREATE TABLE IF NOT EXISTS bookings (
+    id                 TEXT PRIMARY KEY,
+    slot_id            TEXT NOT NULL REFERENCES availability_slots (id),
+    patient_id         TEXT NOT NULL REFERENCES users (id),
+    doctor_id          TEXT NOT NULL REFERENCES users (id),
+    start_at           REAL NOT NULL,
+    end_at             REAL NOT NULL,
+    problem            TEXT NOT NULL,
+    -- copied from admin settings when the booking was made
+    price_poisha       INTEGER NOT NULL,     -- paid by the patient at booking time
+    doctor_pay_poisha  INTEGER NOT NULL,     -- what the doctor earns if the call happens
+    designation        TEXT,
+    status             TEXT NOT NULL CHECK (status IN
+                       ('confirmed', 'in_call', 'completed', 'cancelled', 'patient_no_show', 'doctor_no_show', 'both_no_show')),
+    cancelled_by       TEXT,
+    refund_poisha      INTEGER NOT NULL DEFAULT 0,
+    doctor_paid_poisha INTEGER NOT NULL DEFAULT 0,
+    patient_joined_at  REAL,
+    doctor_joined_at   REAL,
+    consultation_id    TEXT,
+    reminder_sent      INTEGER NOT NULL DEFAULT 0,
+    created_at         REAL NOT NULL,
+    closed_at          REAL
+);
+CREATE INDEX IF NOT EXISTS booking_patient ON bookings (patient_id, start_at);
+CREATE INDEX IF NOT EXISTS booking_doctor ON bookings (doctor_id, start_at);

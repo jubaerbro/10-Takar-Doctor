@@ -6,6 +6,7 @@ import '../api.dart';
 import '../state.dart';
 import '../strings.dart';
 import '../video.dart';
+import 'bookings.dart';
 import 'onboarding.dart';
 
 /// One screen for the whole life of a consultation: searching, the call itself, and the summary after.
@@ -365,6 +366,14 @@ class _CallScreenState extends State<CallScreen> {
 
   // --------------------------------------------------------------------------- after the call
 
+  void _bookAgain() {
+    final dynamic doctor = _c['doctor'];
+    if (doctor is! Map) return;
+    Navigator.of(context).push(MaterialPageRoute<bool>(
+      builder: (BuildContext context) => BookDoctorScreen(doctorId: doctor['id'] as String),
+    ));
+  }
+
   Widget _adviceNote() {
     final dynamic note = _c['advice_note'];
     if (note is! Map) {
@@ -447,6 +456,13 @@ class _CallScreenState extends State<CallScreen> {
                   ],
                 ),
                 _adviceNote(),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                  onPressed: _bookAgain,
+                  icon: const Icon(Icons.event_available),
+                  label: Text(t('book_again')),
+                ),
               ],
               if (connected)
                 Align(

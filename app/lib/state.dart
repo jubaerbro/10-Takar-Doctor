@@ -105,3 +105,16 @@ String clock(int seconds) {
   final String s = (safe % 60).toString().padLeft(2, '0');
   return '$m:$s';
 }
+
+String _two(int n) => n.toString().padLeft(2, '0');
+
+/// A Unix time as the phone's local date and time, for example 12/11/2026 14:30.
+String dateText(num unixSeconds) {
+  final DateTime d = DateTime.fromMillisecondsSinceEpoch((unixSeconds * 1000).round());
+  return '${_two(d.day)}/${_two(d.month)}/${d.year} ${_two(d.hour)}:${_two(d.minute)}';
+}
+
+String timeText(num unixSeconds) {
+  final DateTime d = DateTime.fromMillisecondsSinceEpoch((unixSeconds * 1000).round());
+  return '${_two(d.hour)}:${_two(d.minute)}';
+}

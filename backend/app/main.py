@@ -19,7 +19,7 @@ from .api import ROUTES, api_error_handler, hub, principal_from_token
 from .core import ApiError, Config
 
 # Importing these modules registers their routes.
-from . import accounts, wallet, matching, admin  # noqa: E402,F401
+from . import accounts, wallet, matching, bookings, admin  # noqa: E402,F401
 
 
 async def health(request):

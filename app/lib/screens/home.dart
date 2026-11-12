@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../state.dart';
 import '../strings.dart';
+import 'bookings.dart';
 import 'call.dart';
 import 'onboarding.dart';
 
@@ -17,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Timer? _watcher;
   Map<String, dynamic>? _waiting; // our parked request, if a doctor of the wanted type was not online
+  Map<String, dynamic>? _nextBooking; // our next booked call, if any
   bool _callOpen = false;
   bool _checking = false;
   bool _starting = false; // a new search is being sent; the watcher must not open it first
@@ -44,6 +46,11 @@ class _HomeScreenState extends State<HomeScreen> {
       final Map<String, dynamic> result = await appState.api.get('/consultations/current');
       final dynamic current = result['consultation'];
       if (!mounted || _callOpen) return;
+      final dynamic next = result['next_booking'];
+      final Map<String, dynamic>? nextBooking = next is Map ? next.cast<String, dynamic>() : null;
+      if (nextBooking?['id'] != _nextBooking?['id'] || nextBooking?['start_at'] != _nextBooking?['start_at']) {
+        setState(() => _nextBooking = nextBooking);
+      }
       if (current is! Map) {
         if (_waiting != null) setState(() => _waiting = null);
       } else if (current['status'] == 'waiting') {
@@ -165,6 +172,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+                  if (_nextBooking != null)
+                    NextBookingBanner(booking: _nextBooking!, onOpen: () => _open(const BookingsScreen())),
                   const Spacer(),
                   Icon(Icons.video_call, size: 96, color: colors.primary),
                   const SizedBox(height: 12),
@@ -176,10 +185,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text(t('find_doctor'), style: const TextStyle(fontSize: 22)),
                   ),
                   const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => _open(const HistoryScreen()),
-                    icon: const Icon(Icons.history),
-                    label: Text(t('history')),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      TextButton.icon(
+                        onPressed: () => _open(const BookingsScreen()),
+                        icon: const Icon(Icons.event),
+                        label: Text(t('bookings')),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: () => _open(const HistoryScreen()),
+                        icon: const Icon(Icons.history),
+                        label: Text(t('history')),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -428,7 +448,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(_transactionName(tx['type'] as String)),
-                    subtitle: Text(_dateText(tx['created_at'] as num)),
+                    subtitle: Text(dateText(tx['created_at'] as num)),
                     trailing: Text(
                       taka(tx['amount_taka'] as num),
                       style: TextStyle(
@@ -449,11 +469,6 @@ String _transactionName(String type) {
   return name == key ? type : name;
 }
 
-String _dateText(num unixSeconds) {
-  final DateTime d = DateTime.fromMillisecondsSinceEpoch((unixSeconds * 1000).round());
-  String two(int n) => n.toString().padLeft(2, '0');
-  return '${two(d.day)}/${two(d.month)}/${d.year} ${two(d.hour)}:${two(d.minute)}';
-}
 
 // ----------------------------------------------------------------------------- history
 
@@ -500,7 +515,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           return ListTile(
             leading: const Icon(Icons.person),
             title: Text(doctor is Map ? doctor['name'] as String : t('call_ended')),
-            subtitle: Text('${_dateText(c['created_at'] as num)} · ${c['problem']}'),
+            subtitle: Text('${dateText(c['created_at'] as num)} · ${c['problem']}'),
             trailing: Text(taka(c['price_charged_taka'] as num)),
             onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
               builder: (BuildContext context) => CallScreen(consultation: c, request: null),

@@ -50,6 +50,8 @@ class Api {
 
   Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) => _send('PUT', path, body);
 
+  Future<Map<String, dynamic>> delete(String path) => _send('DELETE', path, null);
+
   /// Send one file with some form fields (used for the doctor's verification documents).
   Future<Map<String, dynamic>> upload(
     String path, {

@@ -52,9 +52,9 @@ button.btn:disabled { opacity: .5; cursor: default; }
 .tabs button.active { background: var(--green); border-color: var(--green); color: #fff; }
 
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #e7ebe9; }
-.badge.approved, .badge.active, .badge.resolved { background: #d9f0e3; color: var(--green-dark); }
+.badge.approved, .badge.active, .badge.resolved, .badge.completed, .badge.confirmed, .badge.in_call { background: #d9f0e3; color: var(--green-dark); }
 .badge.pending, .badge.changes_requested, .badge.open { background: #fdecc8; color: var(--amber); }
-.badge.rejected, .badge.suspended { background: #f9dedc; color: var(--red); }
+.badge.rejected, .badge.suspended, .badge.cancelled, .badge.patient_no_show, .badge.doctor_no_show, .badge.both_no_show { background: #f9dedc; color: var(--red); }
 .kv { display: grid; grid-template-columns: 170px 1fr; gap: 6px 14px; margin: 0; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }

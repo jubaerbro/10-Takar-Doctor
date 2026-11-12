@@ -11,7 +11,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from starlette.responses import FileResponse
 
-from . import core, settings_store, wallet
+from . import bookings, core, settings_store, wallet
 from .api import hub, route
 from .core import ApiError
 from .matching import LIVE_FOR_PATIENT, drop_doctor, release_unconnected
@@ -239,6 +239,7 @@ async def suspend_user(request, admin, data: Suspend):
     if data.suspended:
         core.run("UPDATE doctor_profiles SET online = 0 WHERE user_id = ?", user_id)
         await hub.send_all(drop_doctor(user_id))
+        await hub.send_all(bookings.cancel_all_for_doctor(user_id))   # a suspended doctor's bookings are refunded in full
         # A suspended patient's search or waiting request is cancelled. A call already in progress is left to finish.
         for c in core.rows(f"SELECT * FROM consultations WHERE patient_id = ? AND status IN {LIVE_FOR_PATIENT} AND status != 'active'", user_id):
             await hub.send_all(release_unconnected(c, "cancelled", "system"))
@@ -264,6 +265,21 @@ async def adjust_wallet(request, admin, data: Adjust):
         balance = wallet.add(data.user_id, data.kind, amount, "admin", admin["id"], data.reason)
         core.audit(admin["id"], f"wallet_{data.kind}", data.user_id, amount_taka=data.amount_taka, reason=data.reason)
     return {"user_id": data.user_id, "balance_taka": core.to_taka(balance)}
+
+
+@route("/admin/bookings", ["GET"], roles=("admin",), admin_roles=SUPPORT)
+async def list_bookings(request, admin, data):
+    """Bookings for the support team: "upcoming" (default) or "past"."""
+    if request.query_params.get("when", "upcoming") == "upcoming":
+        found = core.rows("SELECT * FROM bookings WHERE status IN ('confirmed', 'in_call') ORDER BY start_at LIMIT 200")
+    else:
+        found = core.rows("SELECT * FROM bookings WHERE status NOT IN ('confirmed', 'in_call') ORDER BY start_at DESC LIMIT 200")
+    return {"bookings": [{
+        "id": b["id"], "status": b["status"], "start_at": b["start_at"], "end_at": b["end_at"], "problem": b["problem"],
+        "price_taka": core.to_taka(b["price_poisha"]), "doctor_pay_taka": core.to_taka(b["doctor_pay_poisha"]),
+        "refund_taka": core.to_taka(b["refund_poisha"]), "doctor_paid_taka": core.to_taka(b["doctor_paid_poisha"]),
+        "cancelled_by": b["cancelled_by"], "patient": user_summary(b["patient_id"]), "doctor": user_summary(b["doctor_id"]),
+    } for b in found]}
 
 
 @route("/admin/reports", ["GET"], roles=("admin",), admin_roles=SUPPORT)
@@ -310,6 +326,7 @@ async def dashboard(request, admin, data):
         "calls_in_progress": count("SELECT COUNT(*) AS n FROM consultations WHERE status = 'active'"),
         "patients_waiting": count("SELECT COUNT(*) AS n FROM consultations WHERE status IN ('searching', 'offered', 'waiting', 'ready')"),
         "waiting_requests": count("SELECT COUNT(*) AS n FROM consultations WHERE status = 'waiting'"),
+        "bookings_upcoming": count("SELECT COUNT(*) AS n FROM bookings WHERE status = 'confirmed'"),
         "open_reports": count("SELECT COUNT(*) AS n FROM reports WHERE status = 'open'"),
         "today": {"calls": count("SELECT COUNT(*) AS n FROM consultations WHERE status = 'ended' AND ended_at >= ?", day),
                   "income_taka": core.to_taka(money["income"]), "doctor_pay_taka": core.to_taka(money["pay"]),

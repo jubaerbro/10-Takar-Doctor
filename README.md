@@ -41,7 +41,10 @@ Doctor flow: doctor agreement, details, photos of BMDC certificate, degree, NID 
 verification, then an online switch, incoming calls with accept and decline, waiting requests, the call
 screen, the written advice note and earnings.
 
-Not in the app yet: real payments, phone notifications, bookings.
+Bookings: after a completed call the patient can book that doctor again from the call summary or from
+history; doctors open their bookable hours; both sides join from the Bookings screen at the time.
+
+Not in the app yet: real payments, phone notifications.
 
 ## Video calls
 
@@ -80,7 +83,8 @@ this is on. Set `DEV_MODE` to `0` in Render before any real user touches it.
 | Doctor pay by designation: per call + per minute | Working |
 | Advice notes (no medicine field), ratings, reports, suspensions | Working |
 | Video calls (LiveKit) | Per-call join tokens; the room is closed when the call ends. Not yet tried against a real LiveKit project. |
-| Bookings, Pro plans, discounts and promo codes | Not built yet |
+| Bookings: doctors open slots, patients book a doctor they have consulted, joining, cancellation and no-show rules | Working |
+| Pro plans, discounts and promo codes | Not built yet |
 
 ## Run it
 
@@ -126,6 +130,7 @@ Errors look like `{"error": {"code": "...", "message": "..."}}`.
 | `GET /consultations` · `GET /consultations/{id}` | History · one consultation |
 | `POST /consultations/{id}/end` | End the call (for a patient this is also "next doctor") |
 | `POST /consultations/{id}/report` | Report the other person |
+| `GET /bookings` · `GET /bookings/{id}` · `POST /bookings/{id}/join` · `/cancel` | My bookings; join at the time; cancel |
 | `WS /ws?token=...` | Live events: `offer`, `offer_closed`, `consultation`, `verification` |
 
 **Patient**
@@ -137,6 +142,7 @@ Errors look like `{"error": {"code": "...", "message": "..."}}`.
 | `POST /consultations/{id}/cancel` | Stop searching or cancel a waiting request; any held money comes back |
 | `POST /consultations/{id}/join` | Join when a doctor has picked up your waiting request (status `ready`) |
 | `POST /consultations/{id}/rating` | Rate the doctor, 1–5 |
+| `GET /doctors/{id}/slots` · `POST /bookings` | A consulted doctor's open times and price · book one |
 
 **Doctor**
 
@@ -147,6 +153,7 @@ Errors look like `{"error": {"code": "...", "message": "..."}}`.
 | `POST /consultations/{id}/accept` · `/decline` | Answer an offered call |
 | `PUT /consultations/{id}/advice-note` | Written advice after the call |
 | `GET /doctor/earnings` | Today, last 7 days, all time |
+| `GET /doctor/slots` · `POST /doctor/slots` · `DELETE /doctor/slots/{id}` | Bookable hours |
 
 **Admin**
 
@@ -172,6 +179,27 @@ Errors look like `{"error": {"code": "...", "message": "..."}}`.
    - within 3 seconds: free. The hold is returned and the doctor is not paid. Patients get 10 free skips a day.
    - otherwise: the patient is charged the price; the doctor earns `per call + per minute × minutes` for their designation.
 5. The server ends any call that reaches the cap.
+
+## Bookings
+
+A patient can book only a doctor they have already had a completed call with.
+
+1. The doctor opens slots (15 minutes each) under **Bookable hours**.
+2. The patient picks a slot and pays the booking price for the doctor's designation straight away.
+3. From 2 minutes before the start, each side taps **Join**. The call starts when both have, and ends at the slot's end time.
+4. When the call ends the doctor earns 70% of the booking price.
+
+| Situation | Patient | Doctor |
+| --- | --- | --- |
+| Patient cancels 2 hours or more before | Full refund; the slot reopens | Nothing |
+| Patient cancels later than that | No refund | Paid their share |
+| Doctor cancels, or is suspended | Full refund | Nothing |
+| Doctor has not joined 5 minutes after the start | Full refund | Nothing |
+| Patient has not joined 5 minutes after the start | No refund | Paid their share |
+| Neither joined | Full refund | Nothing |
+
+A doctor with a booking about to start is not offered instant calls that could run into it.
+Both sides get an SMS reminder 10 minutes before (once an SMS provider is connected). Every number here is an admin setting.
 
 ## Waiting requests
 

@@ -95,6 +95,7 @@ const VIEWS = [
   { id: 'dashboard', label: 'Dashboard', roles: null, render: dashboardView },
   { id: 'doctors', label: 'Doctor verification', roles: ['verifier', 'support_finance'], render: doctorsView },
   { id: 'users', label: 'Users and wallets', roles: ['support_finance'], render: usersView },
+  { id: 'bookings', label: 'Bookings', roles: ['support_finance'], render: bookingsView },
   { id: 'reports', label: 'Reports', roles: ['support_finance'], render: reportsView },
   { id: 'settings', label: 'Prices and settings', roles: [], render: settingsView },
   { id: 'admins', label: 'Admin accounts', roles: [], render: adminsView },
@@ -191,6 +192,7 @@ async function dashboardView() {
       card(d.calls_in_progress, 'Calls in progress'),
       card(d.patients_waiting, 'Patients searching or waiting'),
       card(d.waiting_requests, 'Waiting requests'),
+      card(d.bookings_upcoming, 'Upcoming bookings'),
       card(d.open_reports, 'Open reports')),
     h('h2', {}, 'Today'),
     h('div', { class: 'cards' },
@@ -366,6 +368,23 @@ async function userDetail(id) {
     table([{ label: 'When' }, { label: 'Type' }, { label: 'Note' }, { label: 'Amount', num: true }, { label: 'Balance after', num: true }], rows));
 }
 
+// ----------------------------------------------------------------------------- bookings
+
+async function bookingsView(arg) {
+  const which = (arg && arg.when) || 'upcoming';
+  const { bookings } = await api('GET', '/admin/bookings?when=' + which);
+  const person = (p) => (p ? h('a', { href: '#', onclick: (e) => { e.preventDefault(); show('users', { id: p.id }); } }, p.name || p.alias) : '—');
+  const rows = bookings.map((b) => h('tr', {},
+    h('td', {}, when(b.start_at)), h('td', {}, person(b.doctor)), h('td', {}, person(b.patient)),
+    h('td', {}, badge(b.status), b.cancelled_by ? ' by ' + b.cancelled_by : ''),
+    h('td', { class: 'num' }, taka(b.price_taka)), h('td', { class: 'num' }, taka(b.refund_taka)), h('td', { class: 'num' }, taka(b.doctor_paid_taka))));
+  return h('div', {},
+    h('h1', {}, 'Bookings'),
+    h('div', { class: 'tabs' }, ['upcoming', 'past'].map((s) => h('button', { class: s === which ? 'active' : null, onclick: () => show('bookings', { when: s }) }, s))),
+    h('p', { class: 'muted' }, 'Refunds and doctor pay follow the booking rules in Prices and settings. For anything else, open the person and adjust their wallet.'),
+    table([{ label: 'Starts' }, { label: 'Doctor' }, { label: 'Patient' }, { label: 'Status' }, { label: 'Paid', num: true }, { label: 'Refunded', num: true }, { label: 'Doctor paid', num: true }], rows));
+}
+
 // ----------------------------------------------------------------------------- reports
 
 async function reportsView(arg) {
@@ -408,6 +427,11 @@ const NUMBER_SETTINGS = [
   ['offer_timeout_seconds', 'Time for a doctor to answer', 'seconds before the call moves to the next doctor'],
   ['waiting_request_minutes', 'Waiting request lifetime', 'minutes a saved request waits for a matching doctor'],
   ['patient_join_seconds', 'Time for a patient to join', 'seconds, once a doctor picks up their waiting request'],
+  ['booking_minutes', 'Booked call length', 'minutes per bookable slot'],
+  ['booking_doctor_share_percent', 'Doctor share of a booking', 'percent of the booking price the doctor earns'],
+  ['booking_cancel_free_minutes', 'Free cancellation until', 'minutes before the start; later than this, no refund and the doctor is paid'],
+  ['booking_no_show_minutes', 'Late joining allowed', 'minutes after the start before a missing side counts as a no-show'],
+  ['booking_reminder_minutes', 'Booking reminder SMS', 'minutes before the start; 0 for none'],
   ['min_topup_taka', 'Smallest top-up', 'taka'],
   ['doctor_registration_fee_taka', 'Doctor registration fee', 'taka, taken once when a doctor submits; 0 for none'],
 ];
@@ -494,7 +518,7 @@ async function settingsView() {
     h('h2', {}, 'Doctor pay and booking price, by designation'),
     table([{ label: 'Designation' }, { label: 'Per call (taka)' }, { label: 'Per minute (taka)' }, { label: 'Pay for a full-length call', num: true },
       { label: 'Left from the call price', num: true }, { label: 'Booking price (taka)' }], payRows),
-    h('p', { class: 'muted' }, 'A red figure means a full-length call pays the doctor more than the patient is charged. Booking prices are saved now; bookings themselves are not built yet.'),
+    h('p', { class: 'muted' }, 'A red figure means a full-length instant call pays the doctor more than the patient is charged. Booking prices apply to new bookings only.'),
     h('h2', {}, 'Other'),
     h('div', { class: 'panel' },
       field('Specialties patients can filter by (comma-separated)', specialties),

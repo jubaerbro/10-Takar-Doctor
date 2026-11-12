@@ -28,7 +28,12 @@ DEFAULTS: dict = {
         "consultant":          {"per_call_taka": 8,  "per_minute_taka": 0.8},
         "medical_officer":     {"per_call_taka": 5,  "per_minute_taka": 0.5},
     },
-    "booking_price_taka": {              # price to book a known doctor, by designation (bookings come later)
+    "booking_minutes": 15,               # length of one bookable slot
+    "booking_doctor_share_percent": 70,  # share of the booking price the doctor earns
+    "booking_cancel_free_minutes": 120,  # a patient who cancels at least this long before the start gets a full refund
+    "booking_no_show_minutes": 5,        # how long after the start time someone may still join
+    "booking_reminder_minutes": 10,      # SMS reminder this long before the start; 0 for none
+    "booking_price_taka": {              # price to book a known doctor, by designation
         "professor": 500, "associate_professor": 400, "assistant_professor": 300,
         "consultant": 200, "medical_officer": 100,
     },
@@ -63,8 +68,13 @@ def validate(key: str, value) -> None:
     elif key == "terms_version":
         if not isinstance(value, str) or not value:
             raise ApiError(422, "invalid_setting", "terms_version must be text.")
-    elif key in ("instant_call_max_minutes", "offer_timeout_seconds", "waiting_request_minutes", "patient_join_seconds"):
+    elif key in ("instant_call_max_minutes", "offer_timeout_seconds", "waiting_request_minutes", "patient_join_seconds",
+                 "booking_minutes", "booking_no_show_minutes"):
         _number(key, value, minimum=1)
+    elif key == "booking_doctor_share_percent":
+        _number(key, value)
+        if value > 100:
+            raise ApiError(422, "invalid_setting", "booking_doctor_share_percent cannot be more than 100.")
     else:
         _number(key, value)
 

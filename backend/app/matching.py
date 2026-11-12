@@ -32,6 +32,8 @@ from .api import hub, route
 from .core import ApiError
 
 Events = list[tuple[str, str, dict]]
+EXTRA_SWEEPS: list = []            # other modules add their own housekeeping here (bookings does)
+CURRENT_EXTRAS: list = []          # and extra fields for GET /consultations/current
 STALE_SECONDS = 90   # a doctor who has not sent a heartbeat for this long is treated as offline
 NOTE_EDIT_SECONDS = 3600
 MAX_MISSED_JOINS = 2  # a waiting request is cancelled after the patient fails to join this many times
@@ -118,7 +120,11 @@ def find_doctor(c):
         "AND d.user_id NOT IN (SELECT doctor_id FROM consultations "
         "                      WHERE status IN ('offered', 'ready', 'active') AND doctor_id IS NOT NULL)"
     )
-    args: list = [core.now() - STALE_SECONDS]
+    now = core.now()
+    args: list = [now - STALE_SECONDS]
+    # A doctor with a booked call about to start must not be handed an instant call that would run into it.
+    sql += " AND d.user_id NOT IN (SELECT doctor_id FROM bookings WHERE status = 'confirmed' AND start_at <= ? AND end_at > ?)"
+    args += [now + settings_store.get("instant_call_max_minutes") * 60 + 60, now]
     if filters.get("specialty"):
         sql += " AND d.specialty = ?"
         args.append(filters["specialty"])
@@ -295,20 +301,30 @@ def release_unconnected(c, status: str, ended_by: str) -> Events:
 
 
 def finish(c, ended_by: str) -> Events:
-    """End a connected call, then charge the patient and pay the doctor, or neither if it was a free skip."""
+    """End a connected call, then charge the patient and pay the doctor, or neither if it was a free skip.
+
+    A booked call was paid for when it was booked: here the doctor is paid and the booking is closed.
+    """
     now = core.now()
     elapsed = max(0.0, now - c["started_at"])
     duration = int(min(elapsed, c["max_seconds"]))
-    free = elapsed <= c["free_skip_seconds"]
+    booked = c["type"] == "booked"
+    free = not booked and elapsed <= c["free_skip_seconds"]
     if free and ended_by == "patient":
         used = core.one(
             "SELECT COUNT(*) AS n FROM consultations WHERE patient_id = ? AND status = 'skipped' AND ended_by = 'patient' AND ended_at >= ?",
             c["patient_id"], core.bd_day_start(now))["n"]
         free = used < settings_store.get("free_skips_per_day")
     with core.tx():
-        wallet.add(c["patient_id"], "release", c["hold_poisha"], "consultation", c["id"], "Instant call: hold returned")
+        if c["held"]:
+            wallet.add(c["patient_id"], "release", c["hold_poisha"], "consultation", c["id"], "Instant call: hold returned")
         price = pay = 0
-        if not free:
+        if booked:
+            booking = core.one("SELECT * FROM bookings WHERE consultation_id = ?", c["id"])
+            price, pay = booking["price_poisha"], c["pay_per_call_poisha"]
+            wallet.add(c["doctor_id"], "earning", pay, "booking", booking["id"], "Booked call")
+            core.run("UPDATE bookings SET status = 'completed', doctor_paid_poisha = ?, closed_at = ? WHERE id = ?", pay, now, booking["id"])
+        elif not free:
             price = c["hold_poisha"]
             minutes = max(1, math.ceil(duration / 60))
             pay = c["pay_per_call_poisha"] + c["pay_per_minute_poisha"] * minutes
@@ -339,6 +355,8 @@ def sweep() -> Events:
     for c in core.rows("SELECT * FROM consultations WHERE status = 'waiting' AND waiting_since <= ?",
                        now - settings_store.get("waiting_request_minutes") * 60):
         events += release_unconnected(c, "no_doctor", "system")
+    for extra in EXTRA_SWEEPS:
+        events += extra()
     return events + assign_pending()
 
 
@@ -441,7 +459,10 @@ async def current(request, user, data):
     column = "patient_id" if user["role"] == "patient" else "doctor_id"
     states = LIVE_FOR_PATIENT if user["role"] == "patient" else LIVE_FOR_DOCTOR
     c = core.one(f"SELECT * FROM consultations WHERE {column} = ? AND status IN {states}", user["id"])
-    return {"consultation": view(c, user["role"]) if c else None}
+    out = {"consultation": view(c, user["role"]) if c else None}
+    for extra in CURRENT_EXTRAS:
+        out.update(extra(user))
+    return out
 
 
 @route("/consultations", ["GET"], roles=("patient", "doctor"))

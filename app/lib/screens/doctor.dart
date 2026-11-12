@@ -8,6 +8,7 @@ import '../api.dart';
 import '../state.dart';
 import '../strings.dart';
 import '../video.dart';
+import 'bookings.dart';
 import 'home.dart';
 import 'onboarding.dart';
 
@@ -361,16 +362,16 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
   bool _busy = false;
   bool _callOpen = false;
   bool _checking = false;
+  Map<String, dynamic>? _nextBooking;
 
   @override
   void initState() {
     super.initState();
     final dynamic profile = appState.me?['profile'];
     _online = profile is Map && profile['online'] == true;
-    // While online: look for calls every 2 seconds, and tell the server we are still here every 30.
-    _poller = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
-      if (_online) _checkForCall();
-    });
+    // Look for calls every 2 seconds (a booked call can start while offline), and while online
+    // tell the server we are still here every 30.
+    _poller = Timer.periodic(const Duration(seconds: 2), (Timer timer) => _checkForCall());
     _heartbeat = Timer.periodic(const Duration(seconds: 30), (Timer timer) => _beat());
     WidgetsBinding.instance.addPostFrameCallback((Duration _) {
       _checkForCall(); // a call may already be under way if the app was restarted
@@ -405,6 +406,11 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
     try {
       final Map<String, dynamic> result = await appState.api.get('/consultations/current');
       final dynamic current = result['consultation'];
+      final dynamic next = result['next_booking'];
+      final Map<String, dynamic>? nextBooking = next is Map ? next.cast<String, dynamic>() : null;
+      if (mounted && (nextBooking?['id'] != _nextBooking?['id'] || nextBooking?['start_at'] != _nextBooking?['start_at'])) {
+        setState(() => _nextBooking = nextBooking);
+      }
       if (current is Map && mounted && !_callOpen) {
         _openCall(current.cast<String, dynamic>());
       }
@@ -423,6 +429,11 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
     _callOpen = false;
     _loadEarnings();
     _beat();
+  }
+
+  Future<void> _openScreen(Widget screen) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (BuildContext context) => screen));
+    _loadEarnings();
   }
 
   Future<void> _loadEarnings() async {
@@ -496,7 +507,28 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            if (_nextBooking != null) NextBookingBanner(booking: _nextBooking!, onOpen: () => _openScreen(const BookingsScreen())),
+            const SizedBox(height: 16),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openScreen(const BookingsScreen()),
+                    icon: const Icon(Icons.event),
+                    label: Text(t('bookings')),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openScreen(const SlotsScreen()),
+                    icon: const Icon(Icons.schedule),
+                    label: Text(t('slots_title')),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
             Text(t('d_earnings'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             if (earnings == null)
