@@ -23,6 +23,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: "3.50.0"   # pinned so a new Flutter release cannot break the build unannounced
           cache: true
 
       # The Android project files are generated here, not stored in the repository (yet).
